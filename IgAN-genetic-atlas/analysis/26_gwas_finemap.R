@@ -62,7 +62,8 @@ finemap <- function(w, anc, lead, rsid, L = 5, flank = 250000) {
     data.table(window = w, ancestry = anc, cs = i, cs_size = length(ix), purity_min_r = round(fit$sets$purity$min.abs.corr[i], 3),
                lead_in_cs = lead %in% names(pip)[ix], top_snp = names(pip)[o[1]], top_pip = round(pip[o[1]], 3),
                snps = paste(sprintf("%s(%.3f)", names(pip)[o], pip[o]), collapse = ";"))
-  })) else data.table(window = w, ancestry = anc, cs = NA_integer_)
+  })) else data.table(window = w, ancestry = anc, cs = NA_integer_, cs_size = NA_integer_, purity_min_r = NA_real_,
+                      lead_in_cs = NA, top_snp = NA_character_, top_pip = NA_real_, snps = NA_character_)
   list(summary = sm, cs = csd, pip = data.table(window = w, ancestry = anc, SNP = m$SNP, P = m$P, pip = round(fit$pip, 4)))
 }
 
@@ -90,3 +91,13 @@ fwrite(PIP, file.path(atl_dir, "Finemap_GWAS_pip.tsv.gz"), sep = "\t")
 cat("\n==== Summary ====\n"); print(S)
 cat("\n==== Credible sets ====\n"); print(CS[, .(window, ancestry, cs, cs_size, purity_min_r, lead_in_cs, top_snp, top_pip)])
 cat("\n==== EAS-EUR credible-set overlap ====\n"); print(ovl)
+
+## ---- CFH sensitivity: single-signal model (L = 1). Its PIPs depend only on the z scores, not on the LD reference,
+##      so it is robust to the summary-statistic/LD inconsistency seen with the European GWAS (s ~ 0.30; multi-signal fit
+##      did not converge). The purity filter for credible sets still uses LD.
+cfh1 <- lapply(c("EAS", "EUR"), function(a) finemap("CFH", a, loci[window == "CFH"]$lead, "rs6677604", L = 1))
+S1 <- rbindlist(lapply(cfh1, `[[`, "summary"), fill = TRUE)[, model := "L=1"]
+CS1 <- rbindlist(lapply(cfh1, `[[`, "cs"), fill = TRUE)[, model := "L=1"]
+fwrite(S1, file.path(atl_dir, "Finemap_GWAS_CFH_L1_summary.tsv"), sep = "\t")
+fwrite(CS1, file.path(atl_dir, "Finemap_GWAS_CFH_L1_credible_sets.tsv"), sep = "\t")
+cat("\n==== CFH single-signal model ====\n"); print(S1); print(CS1[, .(ancestry, cs, cs_size, lead_in_cs, top_snp, top_pip)])
