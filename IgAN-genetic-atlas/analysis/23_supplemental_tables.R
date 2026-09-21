@@ -32,6 +32,8 @@ if (!file.exists(file.path(atl_dir, "Matched_testing_summary.tsv"))) stop("Run 2
 S$S8 <- tidy(fread(file.path(atl_dir, "Matched_testing_summary.tsv")))
 S$S8_genes <- tidy(fread(file.path(atl_dir, "Matched_testing_gene_level.tsv")))
 S$S8_iterations <- fread(file.path(atl_dir, "Matched_testing_iterations.tsv"))
+S$S8_lineage_pairs <- fread(file.path(atl_dir, "Matched_testing_lineage_pairs.tsv"))
+S$S8_strata <- fread(file.path(atl_dir, "Matched_testing_strata.tsv"))
 cat(sprintf("%s: %d rows\n", names(S), sapply(S, nrow)), sep = "")
 
 readme <- data.table(
@@ -45,7 +47,9 @@ readme <- data.table(
             "AlphaGenome variant-effect scores for 24 non-HLA lead variants (top 50 tracks per variant and output type; complete scores in Supplemental_Table_S7_full_AlphaGenome.tsv.gz)",
             "Matched-testing sensitivity analysis, immune cells vs kidney: summary of 2,000 Monte Carlo draws per analysis",
             "Matched-testing sensitivity analysis: gene-level comparison restricted to genes with a strong eQTL in both resources",
-            "Matched-testing sensitivity analysis: number of colocalized windows in each of the 2,000 draws"),
+            "Matched-testing sensitivity analysis: number of colocalized windows in each of the 2,000 draws",
+            "Matched-testing sensitivity analysis: all 45 pairs of immune lineages",
+            "Matched-testing sensitivity analysis: number of tests per window x GWAS ancestry stratum"),
   Notes = c("One row per window x ancestry (GWAS) x cell type x gene. PP.H3/PP.H4, posterior probabilities of distinct/shared causal variants (coloc.abf; p1 = p2 = 1e-4, p12 = 1e-5). top_snp_H4, variant with the highest posterior under H4 (GRCh37). dir_at_top, +1 if the allele raising expression raises IgAN risk.",
             "As S1. tissue: Glom, glomerulus; Tube, tubulointerstitium.",
             "coloc.susie with up to five signals per trait; s_gwas/s_eqtl, estimated LD-mismatch parameter; best_pair, credible-set leads of the best-supported pair.",
@@ -53,9 +57,11 @@ readme <- data.table(
             "layer: eQTL (whole blood, n = 1,019) or pQTL (Olink Explore 3072, n = 1,384). MR, Wald ratio at the lead QTL variant (qtl_lead); single instrument, P equals the GWAS P at that variant; OR per unit of the normalized trait.",
             "f_eur/f_eas, risk-allele frequencies; b_*, log odds ratios; V_*, 2p(1-p)beta^2; d_freq/d_effect, exact split of V_EAS - V_EUR; q_fdr, Benjamini-Hochberg adjusted P for the effect difference.",
             "raw_score: signed log fold change for expression scorers (risk_raw re-expressed per risk allele); unsigned magnitude for splicing scorers; activity scorers (is_activity = TRUE) give predicted activity, not allelic effect. quantile_score, percentile relative to common variants for the same scorer and track.",
-            "Restricted to the 23 windows tested in both ImmuNexUT and NephQTL2 (glomerulus and tubulointerstitium pooled). Cell-type matched: 2 of 28 immune-cell types drawn without replacement, equal probability. Test-count matched: within each window x GWAS ancestry, as many immune gene-cell-type tests drawn without replacement as kidney tests. A window counts if any sampled test reaches PP.H4 >= 0.8. empirical_P = (draws <= kidney count + 1)/(2,000 + 1). Seed 20260921 (script 25_matched_testing.R).",
+            "Restricted to the 23 windows tested in both ImmuNexUT and NephQTL2 (glomerulus and tubulointerstitium pooled). Cell-type matched: 2 of 28 immune-cell types drawn without replacement, equal probability. Lineage matched: 2 of 10 lineages, one cell type each. Test-count matched: within each window x GWAS ancestry, as many immune gene-cell-type tests drawn without replacement as kidney tests. A window counts if any sampled test reaches PP.H4 >= 0.8. empirical_P = (draws <= kidney count + 1)/(2,000 + 1). Seed 20260921 (script 25_matched_testing.R).",
             "Same gene, window and GWAS ancestry with eQTL P < 1e-5 in both resources; best PP.H4 across immune-cell types and across kidney compartments.",
-            "cell_type_matched and test_count_matched: windows with PP.H4 >= 0.8 in each draw."))
+            "cell_type_matched, test_count_matched and lineage_matched: windows with PP.H4 >= 0.8 in each draw.",
+            "windows_colocalized: windows (of 23) with PP.H4 >= 0.8 in any cell type of either lineage.",
+            "n_immune, ImmuNexUT tests; nk, NephQTL2 tests. Immune tests exceeded kidney tests in every stratum, so test-count matching was exact."))
 
 wb <- createWorkbook(); hs <- createStyle(textDecoration = "bold", fgFill = "#E8F1FC", border = "bottom")
 addWorksheet(wb, "README"); writeData(wb, "README", "Supplemental Tables S1-S8 for: Ancestry-Resolved Genetic Mapping Links IgA Nephropathy Risk to Myeloid APRIL, FCAR Splicing, and Circulating Factor H", startRow = 1)

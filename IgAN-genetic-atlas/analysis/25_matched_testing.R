@@ -5,6 +5,7 @@ if (!exists("atl_dir")) atl_dir <- file.path(proj_dir, "results", "atlas")
 ## 11b_atlas_immune_coloc.R and 13_atlas_kidney_coloc.R; no other inputs.
 for (p in c("data.table", "ggplot2", "patchwork", "openxlsx")) if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
 library(data.table); library(ggplot2); library(patchwork)
+FAM <- if (capabilities("aqua")) "Arial" else "sans"   # Kidney International: Arial; lowercase panel labels
 fig_dir <- file.path(proj_dir, "results", "figures"); dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)
 N_ITER <- 2000; THR <- 0.8; STRONG <- 1e-5
 set.seed(20260921)
@@ -34,6 +35,28 @@ B <- vapply(seq_len(N_ITER), function(i) {
   s <- unlist(Map(function(ix, n) if (length(ix) <= n) ix else sample(ix, n), idx, nk), use.names = FALSE)
   imx2[s][PP.H4 >= THR, uniqueN(window)] }, integer(1))
 
+## (A2) Lineage-level sensitivity: the 28 ImmuNexUT cell types are not independent (many are subsets of one lineage).
+##      Collapse them into 10 broad lineages; in each draw pick 2 of 10 lineages with equal probability (without
+##      replacement) and one cell type at random within each, so closely related subsets do not add weight.
+##      Also enumerate all 45 lineage pairs using every cell type in both lineages (most generous immune side).
+##      Drawn after A and B so the seeded results of A and B are unchanged.
+lin_map <- c(CL_Mono = "Monocytes", CD16p_Mono = "Monocytes", Int_Mono = "Monocytes", NC_Mono = "Monocytes",
+             Neu = "Neutrophils", LDG = "Neutrophils", mDC = "Myeloid DC", pDC = "Plasmacytoid DC",
+             Naive_B = "B cells", USM_B = "B cells", SM_B = "B cells", DN_B = "B cells", Plasmablast = "Plasmablasts",
+             Naive_CD4 = "CD4 T", Mem_CD4 = "CD4 T", Th1 = "CD4 T", Th2 = "CD4 T", Th17 = "CD4 T", Tfh = "CD4 T",
+             Fr_I_nTreg = "Treg", Fr_II_eTreg = "Treg", Fr_III_T = "Treg",
+             Naive_CD8 = "CD8 T", CM_CD8 = "CD8 T", EM_CD8 = "CD8 T", TEMRA_CD8 = "CD8 T", Mem_CD8 = "CD8 T", NK = "NK")
+stopifnot(all(cells %in% names(lin_map)))
+imx[, lineage := lin_map[cell]]
+lins <- sort(unique(lin_map)); by_lin <- split(names(lin_map), lin_map)
+A2 <- vapply(seq_len(N_ITER), function(i) {
+  ct <- vapply(sample(lins, 2), function(l) { x <- by_lin[[l]]; x[sample.int(length(x), 1)] }, character(1))
+  imx[cell %in% ct & PP.H4 >= THR, uniqueN(window)] }, integer(1))
+pairs <- combn(lins, 2)
+A3 <- apply(pairs, 2, function(p) imx[lineage %in% p & PP.H4 >= THR, uniqueN(window)])
+lin_pairs <- data.table(lineage_1 = pairs[1, ], lineage_2 = pairs[2, ], windows_colocalized = A3)[order(windows_colocalized)]
+print(lin_pairs[1:5])
+
 ## A window counts as colocalized if any sampled test in either GWAS ancestry reaches PP.H4 >= 0.8.
 ## Empirical one-sided P: probability that a matched immune draw gives a count as low as or lower than kidney,
 ## with the +1 correction, (k + 1) / (N + 1).
@@ -42,7 +65,15 @@ summ <- rbind(
   data.table(analysis = "Cell-type matched (2 of 28 immune cell types)", median = median(A), q25 = quantile(A, .25), q75 = quantile(A, .75),
              min = min(A), max = max(A), n_le_2 = sum(A <= 2), kidney_observed = obs_kid, empirical_P = emp(A)),
   data.table(analysis = "Test-count matched (per window x ancestry)", median = median(B), q25 = quantile(B, .25), q75 = quantile(B, .75),
-             min = min(B), max = max(B), n_le_2 = sum(B <= 2), kidney_observed = obs_kid, empirical_P = emp(B)))
+             min = min(B), max = max(B), n_le_2 = sum(B <= 2), kidney_observed = obs_kid, empirical_P = emp(B)),
+  data.table(analysis = "Lineage matched (2 of 10 lineages, 1 cell type each)", median = median(A2), q25 = quantile(A2, .25), q75 = quantile(A2, .75),
+             min = min(A2), max = max(A2), n_le_2 = sum(A2 <= 2), kidney_observed = obs_kid, empirical_P = emp(A2)),
+  data.table(analysis = "All 45 lineage pairs (all cell types in both lineages; exhaustive)", median = median(A3), q25 = quantile(A3, .25), q75 = quantile(A3, .75),
+             min = min(A3), max = max(A3), n_le_2 = sum(A3 <= 2), kidney_observed = obs_kid, empirical_P = NA_real_))
+## exact test-count matching check: strata where immune tests < kidney tests would use all immune tests
+strata <- merge(imx[, .(n_immune = .N), by = .(window, ancestry)], kn, by = c("window", "ancestry"))
+cat(sprintf("Test-count matching: %d window x ancestry strata; immune tests fewer than kidney tests in %d (immune/kidney ratio %.1f-%.1f)\n",
+            nrow(strata), strata[n_immune < nk, .N], min(strata$n_immune / strata$nk), max(strata$n_immune / strata$nk)))
 print(summ)
 
 ## (C) eQTL detectability: windows with at least one gene with eQTL P < 1e-5 in each resource
@@ -62,7 +93,7 @@ cat(sprintf("Gene-level: %d combinations; immune PP.H4 >= 0.8: %d; kidney PP.H4 
 print(D[immune_best_PP.H4 >= THR])
 
 ## ---- Supplemental Fig. S1: null distributions ----
-th <- theme_classic(base_size = 7, base_family = "sans") +
+th <- theme_classic(base_size = 7, base_family = FAM) +
   theme(axis.line = element_line(linewidth = 0.3), axis.ticks = element_line(linewidth = 0.3),
         plot.tag = element_text(face = "bold", size = 10), plot.title = element_text(size = 7, face = "bold"))
 panel <- function(x, ttl, tag) {
@@ -81,15 +112,18 @@ panel <- function(x, ttl, tag) {
     scale_y_continuous(expand = expansion(mult = c(0, 0.25))) +
     labs(x = sprintf("Windows with PP.H4 ≥ 0.8 (of %d tested in both resources)", length(W)), y = sprintf("Draws (of %d)", N_ITER),
          title = ttl, tag = tag) + th }
-fS1 <- panel(A, "Two randomly drawn immune-cell types", "A") / panel(B, "Immune tests matched to kidney test number per window", "B")
-if (capabilities("aqua")) { quartz(type = "pdf", file = file.path(fig_dir, "FigS1_matched_testing.pdf"), width = 120/25.4, height = 110/25.4); print(fS1); dev.off()
-} else ggsave(file.path(fig_dir, "FigS1_matched_testing.pdf"), fS1, width = 120, height = 110, units = "mm", bg = "white", device = cairo_pdf)
-ggsave(file.path(fig_dir, "FigS1_matched_testing.tiff"), fS1, width = 120, height = 110, units = "mm", dpi = 600, compression = "lzw", bg = "white")
+fS1 <- panel(A, "Two randomly drawn immune-cell types", "a") / panel(B, "Immune tests matched to kidney test number per window", "b") /
+  panel(A2, "Two randomly drawn immune lineages (one cell type each)", "c")
+if (capabilities("aqua")) { quartz(type = "pdf", file = file.path(fig_dir, "FigS1_matched_testing.pdf"), width = 120/25.4, height = 160/25.4); print(fS1); dev.off()
+} else ggsave(file.path(fig_dir, "FigS1_matched_testing.pdf"), fS1, width = 120, height = 160, units = "mm", bg = "white", device = cairo_pdf)
+ggsave(file.path(fig_dir, "FigS1_matched_testing.tiff"), fS1, width = 120, height = 160, units = "mm", dpi = 600, compression = "lzw", bg = "white")
 
 ## ---- Supplemental Table S8 ----
 S8 <- list(summary = summ, detectability = det, gene_level = D,
-           iterations = data.table(iteration = seq_len(N_ITER), cell_type_matched = A, test_count_matched = B))
+           iterations = data.table(iteration = seq_len(N_ITER), cell_type_matched = A, test_count_matched = B, lineage_matched = A2))
 fwrite(S8$iterations, file.path(atl_dir, "Matched_testing_iterations.tsv"), sep = "\t")
 fwrite(S8$summary, file.path(atl_dir, "Matched_testing_summary.tsv"), sep = "\t")
 fwrite(S8$gene_level, file.path(atl_dir, "Matched_testing_gene_level.tsv"), sep = "\t")
+fwrite(lin_pairs, file.path(atl_dir, "Matched_testing_lineage_pairs.tsv"), sep = "\t")
+fwrite(strata, file.path(atl_dir, "Matched_testing_strata.tsv"), sep = "\t")
 cat("Step 25 done\n")
