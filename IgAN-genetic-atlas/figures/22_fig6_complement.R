@@ -1,8 +1,9 @@
 ## ---- Fig. 6: complement risk acts through plasma factor H (needs proj_dir, atl_dir; uses results/figures/Fig4_source_data.tsv from the earlier CFH deletion figure) ----
 library(data.table); library(ggplot2); library(patchwork)
+FAM <- if (capabilities("aqua")) "Arial" else "sans"   # Kidney International: Arial; lowercase panel labels
 fig_dir <- file.path(proj_dir, "results", "figures")
 COL <- c(EUR = "#2a78d6", EAS = "#eb6834")
-th <- theme_classic(base_size = 7, base_family = "sans") +
+th <- theme_classic(base_size = 7, base_family = FAM) +
   theme(axis.line = element_line(linewidth = 0.3), axis.ticks = element_line(linewidth = 0.3),
         strip.background = element_blank(), strip.text = element_text(face = "bold", size = 6.5, hjust = 0),
         plot.tag = element_text(face = "bold", size = 10), legend.key.size = unit(2.5, "mm"))
@@ -16,7 +17,7 @@ pA1 <- ggplot(s4[what == "Deletion frequency"], aes(pop, value, fill = hl)) + ge
   geom_text(aes(label = sprintf("%.2f", value)), vjust = -0.4, size = 2) +
   scale_fill_manual(values = c(COL, Other = "#bfbfbf"), guide = "none") +
   scale_y_continuous(limits = c(0, 0.52), expand = c(0, 0)) +
-  labs(x = NULL, y = "CFHR3–CFHR1 deletion frequency", tag = "A") + th
+  labs(x = NULL, y = "CFHR3–CFHR1 deletion frequency", tag = "a") + th
 ldd <- s4[what != "Deletion frequency"][, marker := fifelse(grepl("GWAS", what), "GWAS lead rs6677604", "Kidney CFHR1 eQTL lead")]
 pA2 <- ggplot(ldd, aes(pop, value, shape = marker)) + geom_point(size = 1.8) +
   scale_shape_manual(values = c(16, 2), name = NULL) + scale_y_continuous(limits = c(0, 1.05)) +
@@ -48,21 +49,21 @@ pB <- ggplot(PB, aes(PP.H4, lab, colour = ancestry, shape = ancestry)) +
   scale_colour_manual(values = COL, labels = c(EAS = "East Asian GWAS", EUR = "European GWAS"), name = NULL) +
   scale_shape_manual(values = c(EAS = 16, EUR = 17), labels = c(EAS = "East Asian GWAS", EUR = "European GWAS"), name = NULL) +
   scale_x_continuous(limits = c(0, 1.02), breaks = c(0, 0.5, 0.8, 1), expand = c(0, 0)) +
-  labs(x = "PP.H4", y = NULL, tag = "B") + th +
+  labs(x = "PP.H4", y = NULL, tag = "b") + th +
   theme(strip.text.y = element_text(angle = 0, hjust = 0, size = 6), legend.position = "bottom")
 
-## C. cis-MR at the lead pQTL variant: factor H and FHR-5
+## C. direction-of-effect estimates (Wald ratio at the lead pQTL variant): factor H (primary) and FHR-5 (suggestive)
 MR <- job[layer == "pQTL" & gene %in% c("CFH", "CFHR5"),
           .(trait = fifelse(gene == "CFH", "Plasma factor H", "Plasma FHR-5"), ancestry,
             or = exp(mr_beta), lo = exp(mr_beta - 1.96 * mr_se), hi = exp(mr_beta + 1.96 * mr_se), p = mr_p)]
-MR[, lab := sprintf("%.2f (%.2f-%.2f); P = %s", or, lo, hi, formatC(p, format = "e", digits = 1))]
+MR[, lab := sprintf("%.2f (%.2f-%.2f)", or, lo, hi)]   # single instrument: P equals the GWAS P, so not shown
 pC <- ggplot(MR, aes(or, trait, colour = ancestry)) +
   geom_vline(xintercept = 1, linewidth = 0.3, linetype = 2, colour = "grey50") +
   geom_errorbar(aes(xmin = lo, xmax = hi), width = 0.15, orientation = "y", position = position_dodge(width = 0.5), linewidth = 0.4) +
   geom_point(size = 1.6, position = position_dodge(width = 0.5)) +
   geom_text(aes(x = max(hi) * 1.1, label = lab), hjust = 0, size = 1.9, position = position_dodge(width = 0.5), show.legend = FALSE) +
   scale_colour_manual(values = COL, guide = "none") + scale_x_log10() + coord_cartesian(clip = "off") +
-  labs(x = "IgAN odds ratio per unit increase (cis-MR, log scale)", y = NULL, tag = "C") + th +
+  labs(x = "IgAN odds ratio per unit increase\n(direction-of-effect estimate, Wald ratio; log scale)", y = NULL, tag = "c") + th +
   theme(plot.margin = margin(4, 75, 4, 4))
 
 f6 <- ((pA1 / pA2) | (pB / pC + plot_layout(heights = c(3, 1)))) + plot_layout(widths = c(1, 2))

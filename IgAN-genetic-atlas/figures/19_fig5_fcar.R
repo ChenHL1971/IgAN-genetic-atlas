@@ -1,9 +1,10 @@
 ## ---- Fig. 5: FCAR splice-site variant (paste after Step 11b Part 1; needs get_gwas, kg_window, lift19, panel, atl_dir) ----
 library(data.table); library(ggplot2); library(patchwork)
+FAM <- if (capabilities("aqua")) "Arial" else "sans"   # Kidney International: Arial; lowercase panel labels
 fig_dir <- file.path(proj_dir, "results", "figures"); dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)
 COL <- c(EUR = "#2a78d6", EAS = "#eb6834")
 LDC <- c("#bfbfbf", "#86b6ef", "#3fae5a", "#f0a030", "#d62d20")
-th <- theme_classic(base_size = 7, base_family = "sans") +
+th <- theme_classic(base_size = 7, base_family = FAM) +
   theme(axis.line = element_line(linewidth = 0.3), axis.ticks = element_line(linewidth = 0.3),
         strip.background = element_blank(), strip.text = element_text(face = "bold", size = 6.5, hjust = 0),
         plot.tag = element_text(face = "bold", size = 10), legend.key.size = unit(2.5, "mm"))
@@ -30,7 +31,7 @@ pA <- ggplot(R, aes(pos / 1e6, -log10(P))) +
   geom_point(data = R[SNP == lead19], shape = 23, size = 2, fill = "#7a1fa2", colour = "black", stroke = 0.3) +
   facet_wrap(~track, ncol = 1, scales = "free_y") +
   scale_fill_manual(values = setNames(LDC, levels(R$r2b)), name = expression(r^2 ~ "(EAS)"), drop = FALSE) +
-  labs(x = "Chromosome 19 position (Mb, GRCh37)", y = expression(-log[10] ~ italic(P)), tag = "A") + th +
+  labs(x = "Chromosome 19 position (Mb, GRCh37)", y = expression(-log[10] ~ italic(P)), tag = "a") + th +
   theme(legend.position = "bottom", legend.title = element_text(size = 6)) + guides(fill = guide_legend(nrow = 2, override.aes = list(size = 1.8)))
 
 ## B. AlphaGenome: predicted change in use of this junction, top 15 tracks (unsigned)
@@ -43,7 +44,7 @@ a[, biosample_name := factor(biosample_name, rev(biosample_name))]
 pB <- ggplot(a, aes(abs(raw_score), biosample_name, fill = hl)) + geom_col(width = 0.7) +
   scale_fill_manual(values = c(`Myeloid / blood` = "#eb6834", Other = "#bfbfbf"), name = NULL) +
   scale_x_continuous(expand = expansion(c(0, 0.05))) +
-  labs(x = "Absolute change in junction use (AlphaGenome)", y = NULL, tag = "B") + th + theme(legend.position = "bottom")
+  labs(x = "Unsigned change in junction use (AlphaGenome score)", y = NULL, tag = "b") + th + theme(legend.position = "bottom")
 
 ## C. sQTL effect of the A (risk) allele on FCAR junctions at rs1865097
 jj <- rbindlist(lapply(c("QTD000413", "QTD000360"), function(d)
@@ -57,7 +58,7 @@ pC <- ggplot(jj, aes(beta_A, junction, colour = target)) +
   geom_errorbar(aes(xmin = beta_A - 1.96 * se, xmax = beta_A + 1.96 * se), width = 0.2, orientation = "y", linewidth = 0.4) +
   geom_point(size = 1.5) + facet_wrap(~study, ncol = 1, scales = "free_y") +
   scale_colour_manual(values = c(`Affected junction` = "#d62d20", `Other FCAR junctions` = "grey45"), name = NULL) +
-  labs(x = "Splicing QTL effect of A allele (β, 95% CI)", y = "Junction (GRCh38)", tag = "C") + th + theme(legend.position = "bottom")
+  labs(x = "Splicing QTL effect of A allele (β, 95% CI)", y = "Junction (GRCh38)", tag = "c") + th + theme(legend.position = "bottom")
 
 ## D. PP.H4 at the FCAR locus across layers
 imx <- fread(file.path(atl_dir, "Atlas_immune_coloc_all.tsv.gz"))[window == w & gene == "FCAR"]
@@ -79,10 +80,13 @@ pD <- ggplot(PD, aes(PP.H4, lab, colour = ancestry, shape = ancestry)) +
   scale_colour_manual(values = COL, labels = c(EAS = "East Asian GWAS", EUR = "European GWAS"), name = NULL) +
   scale_shape_manual(values = c(EAS = 16, EUR = 17), labels = c(EAS = "East Asian GWAS", EUR = "European GWAS"), name = NULL) +
   scale_x_continuous(limits = c(0, 1.02), breaks = c(0, 0.5, 0.8, 1), expand = c(0, 0)) +
-  labs(x = "PP.H4", y = NULL, tag = "D") + th + theme(legend.position = "bottom")
+  labs(x = "PP.H4", y = NULL, tag = "d",
+       caption = "The adjacent KIR cluster is copy-number variable; single-variant colocalization cannot separate FCAR from KIR mechanisms.") +
+  th + theme(legend.position = "bottom", plot.caption = element_text(size = 6, face = "italic", hjust = 0))
 
 f5 <- wrap_elements(full = (pA | (pB / pC))) / wrap_elements(full = pD) + plot_layout(heights = c(3, 1.1))
-ggsave(file.path(fig_dir, "Fig5_FCAR_splice.pdf"), f5, width = 180, height = 170, units = "mm", bg = "white", device = cairo_pdf)
+if (capabilities("aqua")) { quartz(type = "pdf", file = file.path(fig_dir, "Fig5_FCAR_splice.pdf"), width = 180/25.4, height = 170/25.4); print(f5); dev.off()
+} else ggsave(file.path(fig_dir, "Fig5_FCAR_splice.pdf"), f5, width = 180, height = 170, units = "mm", bg = "white", device = cairo_pdf)
 ggsave(file.path(fig_dir, "Fig5_FCAR_splice.tiff"), f5, width = 180, height = 170, units = "mm", dpi = 600, compression = "lzw", bg = "white")
 fwrite(jj, file.path(fig_dir, "Fig5C_source_data.tsv"), sep = "\t"); fwrite(PD, file.path(fig_dir, "Fig5D_source_data.tsv"), sep = "\t")
 cat("Fig 5 saved\n"); print(jj[, .(study, junction, ref, alt, beta_A = round(beta_A, 3), pvalue = signif(pvalue, 2))]); print(PD)

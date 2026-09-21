@@ -1,6 +1,7 @@
 ## ---- Fig. 3: cell-type and tissue map of IgAN risk loci (paste after Step 11b Part 1; needs atl_dir, proj_dir) ----
 for (p in c("data.table", "ggplot2", "patchwork")) if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
 library(data.table); library(ggplot2); library(patchwork)
+FAM <- if (capabilities("aqua")) "Arial" else "sans"   # Kidney International: Arial; lowercase panel labels
 fig_dir <- file.path(proj_dir, "results", "figures"); dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)
 SEQ <- c("#fcfcfb", "#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b")
 
@@ -77,7 +78,7 @@ p3 <- ggplot(D, aes(column, window)) +
   scale_y_discrete(labels = function(x) ifelse(x %in% names(row_lab), row_lab[x], x)) +
   facet_grid(anc_lab ~ group, scales = "free_x", space = "free_x", switch = "y") +
   labs(x = NULL, y = NULL) +
-  theme_minimal(base_size = 7, base_family = "sans") +
+  theme_minimal(base_size = 7, base_family = FAM) +
   theme(panel.grid = element_blank(), axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size = 6),
         axis.text.y = element_text(face = "italic", size = 6), strip.placement = "outside",
         strip.text.x = element_text(face = "bold", size = 6.5), strip.text.y.left = element_text(face = "bold", size = 7, angle = 90),
@@ -88,7 +89,8 @@ pg <- ggplot(G, aes(0, window, label = genes)) + geom_text(hjust = 0, size = 1.9
   theme_void(base_size = 7) + theme(strip.text.x = element_text(face = "bold", size = 6.5, vjust = 0), strip.text.y = element_blank(),
                                      panel.spacing.y = unit(3, "mm"))
 p3 <- p3 + pg + plot_layout(widths = c(5, 1.3))
-ggsave(file.path(fig_dir, "Fig3_atlas_map.pdf"), p3, width = 180, height = 235, units = "mm", bg = "white")
+if (capabilities("aqua")) { quartz(type = "pdf", file = file.path(fig_dir, "Fig3_atlas_map.pdf"), width = 180/25.4, height = 235/25.4); print(p3); dev.off()
+} else ggsave(file.path(fig_dir, "Fig3_atlas_map.pdf"), p3, width = 180, height = 235, units = "mm", bg = "white", device = cairo_pdf)
 ggsave(file.path(fig_dir, "Fig3_atlas_map.tiff"), p3, width = 180, height = 235, units = "mm", dpi = 600, compression = "lzw", bg = "white")
 fwrite(D[, .(window, ancestry, group, column = gsub("\n", " ", column), gene, PP.H4)], file.path(fig_dir, "Fig3_source_data.tsv"), sep = "\t")
 cat("Fig 3 saved to", fig_dir, "\n")

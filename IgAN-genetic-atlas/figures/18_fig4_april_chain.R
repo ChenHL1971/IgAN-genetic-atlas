@@ -1,11 +1,12 @@
 ## ---- Fig. 4: the APRIL chain (paste after Step 11b Part 1 + Part 2; needs get_gwas, kg_window, lift19, panel, co_dir, atl_dir) ----
 for (p in c("data.table", "ggplot2", "patchwork")) if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
 library(data.table); library(ggplot2); library(patchwork)
+FAM <- if (capabilities("aqua")) "Arial" else "sans"   # Kidney International: Arial; lowercase panel labels
 fig_dir <- file.path(proj_dir, "results", "figures"); dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)
 COL <- c(EUR = "#2a78d6", EAS = "#eb6834")
 LDC <- c("#bfbfbf", "#86b6ef", "#3fae5a", "#f0a030", "#d62d20")          # r2 bins <0.2 ... >=0.8
 w <- "TNFSF12_13"; lead <- "17:7462969"; xr <- c(7.25, 7.70)             # Mb, GRCh37
-th <- theme_classic(base_size = 7, base_family = "sans") +
+th <- theme_classic(base_size = 7, base_family = FAM) +
   theme(axis.line = element_line(linewidth = 0.3), axis.ticks = element_line(linewidth = 0.3),
         strip.background = element_blank(), strip.text = element_text(face = "bold", size = 6.5, hjust = 0),
         plot.tag = element_text(face = "bold", size = 10), legend.key.size = unit(2.5, "mm"))
@@ -40,9 +41,11 @@ R <- R[pos / 1e6 >= xr[1] & pos / 1e6 <= xr[2]][order(r2b)]
 pA <- ggplot(R, aes(pos / 1e6, -log10(P))) +
   geom_point(aes(fill = r2b), shape = 21, size = 0.9, stroke = 0.1, colour = "grey30") +
   geom_point(data = R[SNP == lead], shape = 23, size = 2, fill = "#7a1fa2", colour = "black", stroke = 0.3) +
+  geom_text(data = R[SNP == lead & track == "IgAN GWAS, East Asian"], aes(label = "rs3803800 (PIP 1.00)"),
+            hjust = 1.08, vjust = 0.5, size = 2.1, fontface = "italic") +
   facet_wrap(~track, ncol = 1, scales = "free_y", strip.position = "top") +
   scale_fill_manual(values = setNames(LDC, levels(R$r2b)), name = expression(r^2 ~ "(EAS)"), drop = FALSE) +
-  labs(x = "Chromosome 17 position (Mb, GRCh37)", y = expression(-log[10] ~ italic(P)), tag = "A") + th +
+  labs(x = "Chromosome 17 position (Mb, GRCh37)", y = expression(-log[10] ~ italic(P)), tag = "a") + th +
   theme(legend.position = "bottom", legend.title = element_text(size = 6)) + guides(fill = guide_legend(nrow = 2, override.aes = list(size = 1.8)))
 
 ## B. PP.H4 for TNFSF13 across layers and ancestries
@@ -71,24 +74,25 @@ pB <- ggplot(PB, aes(PP.H4, lab, colour = ancestry, shape = ancestry)) +
   scale_colour_manual(values = COL, labels = c(EAS = "East Asian GWAS", EUR = "European GWAS"), name = NULL) +
   scale_shape_manual(values = c(EAS = 16, EUR = 17), labels = c(EAS = "East Asian GWAS", EUR = "European GWAS"), name = NULL) +
   scale_x_continuous(limits = c(0, 1.02), breaks = c(0, 0.5, 0.8, 1), expand = c(0, 0)) +
-  labs(x = "PP.H4 (TNFSF13 / APRIL)", y = NULL, tag = "B") + th +
+  labs(x = "PP.H4 (TNFSF13 / APRIL)", y = NULL, tag = "b") + th +
   theme(strip.text.y = element_text(angle = 0, hjust = 0, size = 6), legend.position = "bottom")
 
-## C. cis-MR at the lead QTL variant
+## C. genetically supported direction-of-effect estimate (Wald ratio at the lead QTL variant)
 MR <- job[, .(trait = fifelse(layer == "pQTL", "Plasma APRIL", "Whole-blood TNFSF13"), ancestry,
               or = exp(mr_beta), lo = exp(mr_beta - 1.96 * mr_se), hi = exp(mr_beta + 1.96 * mr_se), p = mr_p)]
-MR[, lab := sprintf("%.2f (%.2f-%.2f); P = %s", or, lo, hi, formatC(p, format = "e", digits = 1))]
+MR[, lab := sprintf("%.2f (%.2f-%.2f)", or, lo, hi)]   # single instrument: P equals the GWAS P, so not shown
 pC <- ggplot(MR, aes(or, trait, colour = ancestry)) +
   geom_vline(xintercept = 1, linewidth = 0.3, linetype = 2, colour = "grey50") +
   geom_errorbar(aes(xmin = lo, xmax = hi), width = 0.15, orientation = "y", position = position_dodge(width = 0.5), linewidth = 0.4) +
   geom_point(size = 1.6, position = position_dodge(width = 0.5)) +
   geom_text(aes(x = max(hi) * 1.08, label = lab), hjust = 0, size = 1.9, position = position_dodge(width = 0.5), show.legend = FALSE) +
   scale_colour_manual(values = COL, guide = "none") + scale_x_log10() + coord_cartesian(clip = "off") +
-  labs(x = "IgAN odds ratio per unit increase (cis-MR, log scale)", y = NULL, tag = "C") + th +
+  labs(x = "IgAN odds ratio per unit increase\n(direction-of-effect estimate, Wald ratio; log scale)", y = NULL, tag = "c") + th +
   theme(plot.margin = margin(4, 70, 4, 4))
 
 f4 <- pA + (pB / pC + plot_layout(heights = c(3.2, 1))) + plot_layout(widths = c(1.25, 1))
-ggsave(file.path(fig_dir, "Fig4_APRIL_chain.pdf"), f4, width = 180, height = 150, units = "mm", bg = "white")
+if (capabilities("aqua")) { quartz(type = "pdf", file = file.path(fig_dir, "Fig4_APRIL_chain.pdf"), width = 180/25.4, height = 150/25.4); print(f4); dev.off()
+} else ggsave(file.path(fig_dir, "Fig4_APRIL_chain.pdf"), f4, width = 180, height = 150, units = "mm", bg = "white", device = cairo_pdf)
 ggsave(file.path(fig_dir, "Fig4_APRIL_chain.tiff"), f4, width = 180, height = 150, units = "mm", dpi = 600, compression = "lzw", bg = "white")
 fwrite(PB, file.path(fig_dir, "Fig4B_source_data.tsv"), sep = "\t"); fwrite(MR, file.path(fig_dir, "Fig4C_source_data.tsv"), sep = "\t")
 cat("Fig 4 saved\n"); print(R[SNP == lead, .(track, P, r2)]); print(MR)
