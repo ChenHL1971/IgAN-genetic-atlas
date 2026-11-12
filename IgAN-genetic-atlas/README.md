@@ -2,7 +2,9 @@
 
 Analysis code for:
 
-> Chen H-L, *et al.* **An ancestry-resolved cell-type and molecular map of genetic risk for IgA nephropathy.** (submitted)
+> Chen H-L, *et al.* **Ancestry-resolved mapping of IgA nephropathy risk loci to immune cells and circulating proteins: APRIL, CD89 and factor H.** (submitted)
+
+Version 1.2.0 is the version for the Genes & Immunity submission (see *Changes in v1.2.0* below).
 
 All analyses use publicly available summary statistics; no individual-level data are included or required.
 
@@ -22,11 +24,36 @@ Run in order. R scripts assume an R session in which `proj_dir` points to the pr
 | 15 | `analysis/15_eqtlcat_replication_sqtl.R` | eQTL Catalogue expression and LeafCutter splicing QTL (25 datasets, remote tabix) |
 | 16 | `analysis/16_job_pqtl.R` | Japan COVID-19 Task Force whole-blood eQTL and Olink pQTL; coloc and cis-MR (Wald ratio) |
 | — | `analysis/23_supplemental_tables.R` | Supplemental Tables S1–S7 |
-| Figs | `figures/20_fig1_design.R` … `figures/22_fig6_complement.R` | Figures 1–6 |
+| 25 | `analysis/25_matched_testing.R` | Matched-testing comparison of immune-cell and kidney colocalization |
+| 26 | `analysis/26_gwas_finemap.R` | Fine-mapping of the GWAS signals |
+| 27 | `analysis/27_truncation_sensitivity.R` | Truncation benchmark: complete ImmuNexUT and eQTL Catalogue data re-analyzed after keeping only variants with QTL *P* < 0.05 (Supplementary Table S12). Run after Step 11b Part 1 and the function definitions of Step 15 |
+| 28 | `analysis/28_additional_analyses.py` | From Supplementary Data S1: exact prior sensitivity (p12 10⁻⁶ to 10⁻⁴), immune vs kidney counts by prior, exact matched analyses with and without the *CFH* window, parametric-bootstrap 95% CIs for the ancestry decomposition (20 000 replicates), Steiger directionality |
+| 29 | `analysis/29_supplementary_data_S1.py` | Builds Supplementary Data S1 (Tables S1–S10 and S12) |
+| Figs | `figures/20_fig1_design.R` … `figures/22_fig6_complement.R` | Figures 1–6 (`21_fig2_ancestry.R` now reads the bootstrap CIs from Step 28) |
+| Fig S2 | `figures/29_figS2_fcar_transcript.py` | *FCAR* transcript structure and the rs1865097 junction (Ensembl ENST00000355524, GRCh38) |
 
 Notes
 - AlphaGenome splicing scores are unsigned magnitudes; activity (`*_ACTIVE`) scorers describe predicted activity, not allelic effect, and are not re-signed. The per-variant summary printed by Step 14 is superseded by the summaries in the manuscript and Supplemental Table S7.
 - Positions are GRCh37 unless stated; GRCh38 resources are lifted with UCSC liftOver (`hg38ToHg19.over.chain`).
+
+## Results files
+
+| File | Content |
+|---|---|
+| `results/Supplementary_Tables_S1-S8_complete.xlsx` | Complete tables from v1.1.3 |
+| `results/Supplementary_Data_S1_v1.1.3.xlsx` | Supplementary Data S1 as first submitted (input to Steps 28–29) |
+| `results/Supplementary_Data_S1.xlsx` | Supplementary Data S1 of the Genes & Immunity submission (Tables S1–S10 and S12) |
+| `results/additional_analyses.xlsx` | All Step 28 output tables |
+| `results/Aim1_decomposition_bootstrapCI.tsv` | Bootstrap 95% CIs for the ancestry decomposition (Figure 2) |
+| `results/truncation/` | Step 27 per-test output (`truncation_immunexut.tsv`, `truncation_eqtlcatalogue.tsv`) |
+
+## Changes in v1.2.0
+
+- Added Steps 27–29 and the Supplementary Figure S2 script.
+- Figure 2 shows parametric-bootstrap 95% CIs.
+- Prior sensitivity extended to p12 = 10⁻⁴; matched analyses repeated without the whole *CFH* window.
+- Truncation benchmark for the Japan COVID-19 Task Force e/pQTL data (truncated at *P* < 0.05).
+- No change to the v1.1.3 primary results.
 
 ## Data sources
 
@@ -43,7 +70,7 @@ Notes
 ## Software
 
 R 4.6.1 (data.table, coloc 5.2.3, susieR, rtracklayer, Rsamtools, ggplot2, patchwork, ggrepel, openxlsx, qpdf);
-Python 3.13 (alphagenome, remotezip, pyliftover, pandas).
+Python 3.13 (alphagenome, remotezip, pyliftover, pandas, numpy, scipy, openpyxl, matplotlib).
 
 ## License
 

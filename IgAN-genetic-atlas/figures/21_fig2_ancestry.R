@@ -1,4 +1,6 @@
 ## ---- Fig. 2: ancestry decomposition of the 30 IgAN signals (needs proj_dir, atl_dir) ----
+## v1.2.0: adds parametric-bootstrap 95% CIs. Put Aim1_decomposition_bootstrapCI.tsv in atl_dir
+## (made by 28_additional_analyses.py; same numbers as Supplementary Table S6).
 library(data.table); library(ggplot2); library(patchwork)
 FAM <- if (capabilities("aqua")) "Arial" else "sans"   # Kidney International: Arial; lowercase panel labels
 fig_dir <- file.path(proj_dir, "results", "figures"); dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)
@@ -7,6 +9,7 @@ th <- theme_classic(base_size = 7, base_family = FAM) +
   theme(axis.line = element_line(linewidth = 0.3), axis.ticks = element_line(linewidth = 0.3),
         plot.tag = element_text(face = "bold", size = 10), legend.key.size = unit(2.5, "mm"))
 d <- fread(file.path(atl_dir, "Aim1_ancestry_decomposition.tsv"))
+d <- merge(d, fread(file.path(atl_dir, "Aim1_decomposition_bootstrapCI.tsv")), by = "locus", sort = FALSE)
 d[, sig := q_fdr < 0.05]
 d[, lab := paste0(locus, fifelse(sig, " *", ""))]
 d[, lab := factor(lab, lab[order(dV)])]
@@ -16,11 +19,17 @@ cat(sprintf("non-HLA total: EUR %.3f, EAS %.3f (+%.0f%%); frequency %.0f%%, effe
 
 ## A. contribution per signal in each ancestry (dumbbell)
 A <- melt(d[, .(lab, hla, EUR = V_eur, EAS = V_eas)], id.vars = c("lab", "hla"), variable.name = "anc", value.name = "V")
-pA <- ggplot(A, aes(V, lab)) +
-  geom_line(aes(group = lab), colour = "grey70", linewidth = 0.4) +
-  geom_point(aes(colour = anc), size = 1.6) +
+Aci <- rbind(d[, .(lab, anc = "EUR", lo = V_eur_lo, hi = V_eur_hi)], d[, .(lab, anc = "EAS", lo = V_eas_lo, hi = V_eas_hi)])
+A <- merge(A, Aci, by = c("lab", "anc"))
+A[, anc := factor(anc, levels = c("EUR", "EAS"))]
+A[, y := as.numeric(lab) + fifelse(anc == "EUR", 0.18, -0.18)]
+pA <- ggplot(A, aes(V, y)) +
+  geom_line(aes(group = lab), colour = "grey80", linewidth = 0.3) +
+  geom_errorbarh(aes(xmin = lo, xmax = hi, colour = anc), height = 0, linewidth = 0.3, alpha = 0.7) +
+  geom_point(aes(colour = anc), size = 1.3) +
+  scale_y_continuous(breaks = seq_along(levels(d$lab)), labels = levels(d$lab), expand = expansion(add = 0.6)) +
   scale_colour_manual(values = COL, labels = c(EUR = "European", EAS = "East Asian"), name = NULL) +
-  labs(x = expression(atop("Variance contribution (log-odds scale)", 2 * p(1 - p) * beta^2)), y = NULL, tag = "a") + th +
+  labs(x = expression(atop("Variance contribution (log-odds scale)", 2 * p(1 - p) * beta^2 * ", 95% CI")), y = NULL, tag = "a") + th +
   theme(legend.position = "top", axis.text.y = element_text(face = "italic", size = 6)) + guides(colour = guide_legend(nrow = 2))
 
 ## B. EAS - EUR difference split into frequency and effect components
@@ -28,8 +37,10 @@ B <- melt(d[, .(lab, Frequency = d_freq, Effect = d_effect)], id.vars = "lab", v
 pB <- ggplot(B, aes(val, lab, fill = comp)) +
   geom_vline(xintercept = 0, linewidth = 0.3, colour = "grey40") +
   geom_col(width = 0.7, position = position_stack()) +
+  geom_errorbarh(data = d, aes(xmin = dV_lo, xmax = dV_hi, y = lab), inherit.aes = FALSE, height = 0, linewidth = 0.3) +
+  geom_point(data = d, aes(x = dV, y = lab), inherit.aes = FALSE, size = 0.7) +
   scale_fill_manual(values = CMP, name = NULL, labels = c(Frequency = "Allele-frequency component", Effect = "Effect-size component")) +
-  labs(x = "Difference\n(East Asian − European)", y = NULL, tag = "b") + th +
+  labs(x = "Difference\n(East Asian − European), 95% CI", y = NULL, tag = "b") + th +
   theme(legend.position = "top", axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank()) +
   guides(fill = guide_legend(nrow = 2))
 
